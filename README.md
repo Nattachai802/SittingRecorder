@@ -1,1 +1,1 @@
-![App UI](สกรีนช็อต 2025-04-24 000419.png)
+![App UI](Preview.png)
