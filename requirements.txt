@@ -1,0 +1,6 @@
+pillow
+opencv-python
+tk
+customtkinter
+time
+datetime
