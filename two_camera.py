@@ -1,5 +1,7 @@
 import cv2
 import customtkinter as ctk
+from customtkinter import CTkImage
+
 from PIL import Image, ImageTk, ImageDraw
 import time
 import datetime
@@ -72,24 +74,26 @@ class DualCameraApp(ctk.CTk):
         # สร้าง main container
         self.main_frame = ctk.CTkFrame(self, fg_color=self.bg_color, corner_radius=0)
         self.main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        # สร้างเฟรมสำหรับส่วนบน (กล้อง) และส่วนล่าง (ตารางบันทึก)
-        self.top_frame = ctk.CTkFrame(self.main_frame, fg_color=self.bg_color, corner_radius=0)
-        self.top_frame.pack(fill="both", expand=True)
-        
-        self.bottom_frame = ctk.CTkFrame(self.main_frame, fg_color=self.bg_color, corner_radius=0, height=200)
-        self.bottom_frame.pack(fill="x", pady=(20, 0))
-        
-        # แบ่งส่วนบนเป็น 3 ส่วน (กล้อง1, ช่องว่าง, กล้อง2, ควบคุม)
+
+        # ✅ ลดความสูง top_frame ให้พอดี
+        self.top_frame = ctk.CTkFrame(self.main_frame, fg_color=self.bg_color, corner_radius=0, height=520)
+        self.top_frame.pack(fill="x")
+
+        # ✅ ไม่ใส่ expand=True แล้ว เพราะมันจะกินเต็มจน bottom_frame ตก
+        # สร้าง bottom_frame รองรับตาราง
+        self.bottom_frame = ctk.CTkFrame(self.main_frame, fg_color=self.bg_color, corner_radius=0, width=700, height=250)
+        self.bottom_frame.pack(fill="x", padx=(0, 0), pady=(20, 0))
+
+        # แบ่ง top_frame เป็นกล้อง 1 กล้อง 2 และ control panel
         self.camera1_frame = ctk.CTkFrame(self.top_frame, fg_color=self.bg_color, corner_radius=0)
         self.camera1_frame.pack(side="left", fill="both", expand=True)
-        
+
         self.camera2_frame = ctk.CTkFrame(self.top_frame, fg_color=self.bg_color, corner_radius=0)
         self.camera2_frame.pack(side="left", fill="both", expand=True, padx=(20, 0))
-        
-        self.control_frame = ctk.CTkFrame(self.top_frame, fg_color=self.bg_color, corner_radius=0, width=300)
+
+        self.control_frame = ctk.CTkScrollableFrame(self.top_frame, fg_color=self.bg_color, corner_radius=0, width=300, height=500)
         self.control_frame.pack(side="right", fill="y", padx=(20, 0))
-        self.control_frame.pack_propagate(False)
+        self.control_frame.pack_propagate(True)
         
         # ============ CAMERA FRAMES ============
         # กรอบสำหรับกล้อง 1
@@ -129,6 +133,15 @@ class DualCameraApp(ctk.CTk):
         
         # Recording Buttons
         self.create_recording_buttons()
+
+        self.countdown_label = ctk.CTkLabel(
+            self.control_frame,
+            text="",
+            font=ctk.CTkFont(size=30, weight="bold"),
+            text_color=self.accent_color
+        )
+        self.countdown_label.pack(pady=(0, 10))
+
         
         # สถานะ - แก้ไขส่วนนี้
         self.status_label = ctk.CTkLabel(
@@ -137,7 +150,7 @@ class DualCameraApp(ctk.CTk):
             font=ctk.CTkFont(size=14),
             text_color=self.text_color
         )
-        self.status_label.pack(pady=(20, 0))  # ต้องเพิ่ม pack() ตรงนี้
+        self.status_label.pack(pady=(20, 0))
         
         # ============ LOG TABLE FRAME ============
         self.create_log_table()
@@ -154,12 +167,12 @@ class DualCameraApp(ctk.CTk):
         )
         posture_label.pack(anchor="w", pady=(0, 5))
         
-        self.posture_var = ctk.StringVar(value="Normal")
+        self.posture_var = ctk.StringVar(value="Forward")
         self.posture_dropdown = ctk.CTkComboBox(
             posture_container, 
             variable=self.posture_var,
             values=[
-                "Normal", "Forward", "Backward", "Lean", "Cross-legged",
+                "Forward", "Backward", "Lean", "Cross-legged",
                 "Feet Supported", "Chin on Hand"
             ],
             width=250,
@@ -172,9 +185,29 @@ class DualCameraApp(ctk.CTk):
             dropdown_text_color=self.text_color,
             text_color=self.text_color,
             font=ctk.CTkFont(size=14),
-            corner_radius=8
+            corner_radius=8,
+            command=self.update_posture_preview  # Add this line
         )
         self.posture_dropdown.pack(fill="x")
+        
+        # Create image label for preview
+        self.posture_image_label = ctk.CTkLabel(posture_container, text="")
+        self.posture_image_label.pack(pady=(10, 0))
+        
+        # Initial preview update
+        self.update_posture_preview()
+
+    def update_posture_preview(self, choice=None):
+        posture = self.posture_var.get().replace(" ", "_").lower()
+        image_path = os.path.join("posture_images", f"{posture}.jpg")
+
+        if os.path.exists(image_path):
+            self.posture_image_pil = Image.open(image_path)  # เก็บ PIL image
+            self.posture_image_obj = CTkImage(self.posture_image_pil, size=(200, 200))  # เก็บ CTkImage
+
+            self.posture_image_label.configure(image=self.posture_image_obj, text="")
+        else:
+            self.posture_image_label.configure(image=None, text="No image available")
 
     def create_fps_section(self):
         fps_container = ctk.CTkFrame(self.control_frame, fg_color=self.bg_color, corner_radius=0)
@@ -271,6 +304,21 @@ class DualCameraApp(ctk.CTk):
         )
         self.timer_display.pack(anchor="w")
 
+        self.duration_var = ctk.StringVar(value="10")
+        self.duration_dropdown = ctk.CTkComboBox(
+            timer_container,
+            values=["10", "15", "20"],
+            variable=self.duration_var,
+            width=80,
+            fg_color="#FFFFFF",
+            border_color=self.accent_color,
+            button_color=self.accent_color,
+            dropdown_fg_color="#FFFFFF",
+            dropdown_text_color=self.text_color,
+            font=ctk.CTkFont(size=14)
+        )
+        self.duration_dropdown.pack(anchor="w", pady=(5, 0))
+
     def create_recording_buttons(self):
         buttons_container = ctk.CTkFrame(self.control_frame, fg_color=self.bg_color, corner_radius=0)
         buttons_container.pack(fill="x", pady=(10, 20))
@@ -290,7 +338,7 @@ class DualCameraApp(ctk.CTk):
         )
         self.start_button.pack(side="left", expand=True, padx=10)
 
-        # ■ ปุ่มหยุดบันทึก - ชิดขวา 
+        # ■ ปุ่มหยุดบันทึก - ชิดขวา
         self.stop_button = ctk.CTkButton(
             buttons_container,
             text="■ หยุดบันทึก",
@@ -302,7 +350,7 @@ class DualCameraApp(ctk.CTk):
             corner_radius=10,
             height=50,
             width=140,
-            state="disabled"
+            state="disabled"  # ปิดการใช้งานปุ่มหยุดในตอนแรก
         )
         self.stop_button.pack(side="right", expand=True, padx=10)
 
@@ -324,9 +372,9 @@ class DualCameraApp(ctk.CTk):
         header_frame = ctk.CTkFrame(log_container, fg_color="#FFFFFF", corner_radius=0)
         header_frame.pack(fill="x", padx=20, pady=(0, 5))
         
-        # ส่วนหัวของตาราง
-        headers = ["วันที่-เวลา", "ท่านั่ง", "ระยะเวลา", "ดูวิดีโอ"]
-        widths = [0.3, 0.3, 0.2, 0.2]
+        # ส่วนหัวของตาราง - เพิ่ม "ลบ" ในรายการ headers
+        headers = ["วันที่-เวลา", "ท่านั่ง", "ระยะเวลา", "ดูวิดีโอ", "ลบ"]
+        widths = [0.3, 0.3, 0.2, 0.1, 0.1]  # ปรับสัดส่วนความกว้าง
         
         for i, header in enumerate(headers):
             header_label = ctk.CTkLabel(
@@ -462,6 +510,35 @@ class DualCameraApp(ctk.CTk):
                 height=25
             )
             view_button.pack(side="left", padx=5)
+            
+            # คอลัมน์ 5: ปุ่มลบวิดีโอ
+            delete_button = ctk.CTkButton(
+                row_frame,
+                text="ลบ",
+                command=lambda filename=log["filename"]: self.delete_video(filename),
+                fg_color="#D9534F",  # สีแดง
+                hover_color="#C9302C",
+                text_color="#FFFFFF",
+                font=ctk.CTkFont(size=12),
+                corner_radius=6,
+                width=80,
+                height=25
+            )
+            delete_button.pack(side="left", padx=5)
+    
+    def delete_video(self, filename):
+        try:
+            file1 = os.path.join(recordings_folder, f"{filename}_camera1.mp4")
+            file2 = os.path.join(recordings_folder, f"{filename}_camera2.mp4")
+            if os.path.exists(file1):
+                os.remove(file1)
+            if os.path.exists(file2):
+                os.remove(file2)
+            self.status_label.configure(text=f"ลบวิดีโอ: {filename} แล้ว")
+            self.load_recording_history()  # อัปเดตตารางใหม่หลังลบ
+        except Exception as e:
+            self.status_label.configure(text=f"ไม่สามารถลบวิดีโอได้: {str(e)}")
+
     
     def open_video(self, filename):
         # เปิดไฟล์วิดีโอด้วยโปรแกรมเริ่มต้นของระบบ
@@ -499,30 +576,56 @@ class DualCameraApp(ctk.CTk):
             self.recording_duration = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
             self.timer_display.configure(text=self.recording_duration)
 
+            if not self.halfway_notified and elapsed >= (self.recording_target_duration / 2):
+                self.status_label.configure(
+                        text="ทำการเปลี่ยนท่านั่ง!",
+                        font=ctk.CTkFont(size=20, weight="bold"),
+                        text_color="#FFA500"  # สีส้ม
+                    )
+                self.halfway_notified = True
+
+            if elapsed >= self.recording_target_duration - 3 and elapsed < self.recording_target_duration:
+                remaining = int(self.recording_target_duration - elapsed)
+                self.countdown_label.configure(text=f"หยุดใน {remaining}")
+            elif elapsed >= self.recording_target_duration:
+                self.countdown_label.configure(text="")
+                self.stop_recording()
+
     def start_recording(self):
+        self.countdown_label.configure(text="เตรียมตัว...")
+        self.after(1000, lambda: self.countdown_before_start(3))
+
+    def countdown_before_start(self, seconds):
+        if seconds > 0:
+            self.countdown_label.configure(text=str(seconds))
+            self.after(1000, lambda: self.countdown_before_start(seconds - 1))
+        else:
+            self.countdown_label.configure(text="เริ่มบันทึก!")
+            self.after(1000, lambda: self.start_actual_recording())  # Start actual recording
+
+    def start_actual_recording(self):
         posture = self.posture_var.get().replace(" ", "_").lower()
         self.current_posture = self.posture_var.get()
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        
-        # สร้างชื่อพื้นฐานสำหรับไฟล์
+
         base_filename = f'{posture}_{timestamp}'
         self.current_filename = base_filename
-        
-        # สร้างไฟล์ในโฟลเดอร์ recordings
+
         filename1 = os.path.join(recordings_folder, f'{base_filename}_camera1.mp4')
         filename2 = os.path.join(recordings_folder, f'{base_filename}_camera2.mp4')
-        
+
         self.out1 = cv2.VideoWriter(filename1, fourcc, self.fps, (640, 480))
         self.out2 = cv2.VideoWriter(filename2, fourcc, self.fps, (640, 480))
-        
+
         self.recording = True
         self.recording_start_time = time.time()
-        
-        # อัพเดทสถานะและปุ่ม
+        self.recording_target_duration = int(self.duration_var.get())
+        self.halfway_notified = False  # Add a flag for halfway notification
+
         self.start_button.configure(state="disabled", fg_color="#CCCCCC", text_color="#666666")
-        self.stop_button.configure(state="normal", fg_color="#E74C3C", text_color="#FFFFFF")  # สีแดงสำหรับปุ่มหยุด
         self.status_label.configure(text=f"กำลังบันทึก... ({posture})")
+        self.countdown_label.configure(text="")  # Clear countdown
 
     def stop_recording(self):
         self.recording = False
@@ -602,13 +705,21 @@ class DualCameraApp(ctk.CTk):
         index = int(choice.split()[-1])
         if self.cap1.isOpened():
             self.cap1.release()
-        self.cap1 = cv2.VideoCapture(index)
+        if cv2.VideoCapture(index).read()[0]:  # ตรวจสอบก่อนเปิด
+            self.cap1 = cv2.VideoCapture(index)
+            self.status_label.configure(text=f"Camera 1 → Camera {index}")
+        else:
+            self.status_label.configure(text=f"Camera {index} ไม่พร้อมใช้งาน")
 
     def update_camera_selection_2(self, choice):
         index = int(choice.split()[-1])
         if self.cap2.isOpened():
             self.cap2.release()
-        self.cap2 = cv2.VideoCapture(index)
+        if cv2.VideoCapture(index).read()[0]:
+            self.cap2 = cv2.VideoCapture(index)
+            self.status_label.configure(text=f"Camera 2 → Camera {index}")
+        else:
+            self.status_label.configure(text=f"Camera {index} ไม่พร้อมใช้งาน")
 
     def on_closing(self):
         if self.recording:
