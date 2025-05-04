@@ -567,30 +567,6 @@ class DualCameraApp(ctk.CTk):
         except ValueError:
             self.status_label.configure(text="ค่า FPS ไม่ถูกต้อง")
 
-    def update_timer(self):
-        if self.recording and self.recording_start_time:
-            elapsed = time.time() - self.recording_start_time
-            hours = int(elapsed // 3600)
-            minutes = int((elapsed % 3600) // 60)
-            seconds = int(elapsed % 60)
-            self.recording_duration = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-            self.timer_display.configure(text=self.recording_duration)
-
-            if not self.halfway_notified and elapsed >= (self.recording_target_duration / 2):
-                self.status_label.configure(
-                        text="ทำการเปลี่ยนท่านั่ง!",
-                        font=ctk.CTkFont(size=20, weight="bold"),
-                        text_color="#FFA500"  # สีส้ม
-                    )
-                self.halfway_notified = True
-
-            if elapsed >= self.recording_target_duration - 3 and elapsed < self.recording_target_duration:
-                remaining = int(self.recording_target_duration - elapsed)
-                self.countdown_label.configure(text=f"หยุดใน {remaining}")
-            elif elapsed >= self.recording_target_duration:
-                self.countdown_label.configure(text="")
-                self.stop_recording()
-
     def start_recording(self):
         self.countdown_label.configure(text="เตรียมตัว...")
         self.after(1000, lambda: self.countdown_before_start(3))
@@ -619,9 +595,12 @@ class DualCameraApp(ctk.CTk):
         self.out2 = cv2.VideoWriter(filename2, fourcc, self.fps, (640, 480))
 
         self.recording = True
-        self.recording_start_time = time.time()
         self.recording_target_duration = int(self.duration_var.get())
         self.halfway_notified = False  # Add a flag for halfway notification
+
+        # ตั้งค่าตัวแปรสำหรับการนับเฟรม
+        self.recorded_frame_count = 0
+        self.target_frame_count = int(self.recording_target_duration * self.fps)
 
         self.start_button.configure(state="disabled", fg_color="#CCCCCC", text_color="#666666")
         self.status_label.configure(text=f"กำลังบันทึก... ({posture})")
@@ -644,6 +623,23 @@ class DualCameraApp(ctk.CTk):
         # รีเซ็ตเวลา
         self.recording_duration = "00:00:00"
         self.timer_display.configure(text=self.recording_duration)
+
+    def update_timer(self):
+        # คำนวณเวลาที่ผ่านไปจากจำนวนเฟรมที่บันทึก
+        elapsed_seconds = self.recorded_frame_count / self.fps
+        minutes = int(elapsed_seconds // 60)
+        seconds = int(elapsed_seconds % 60)
+        self.recording_duration = f"{minutes:02d}:{seconds:02d}"
+        self.timer_display.configure(text=self.recording_duration)
+
+        # แจ้งเตือนเมื่อถึงครึ่งหนึ่งของเวลา
+        if not self.halfway_notified and self.recorded_frame_count >= self.target_frame_count // 2:
+            self.halfway_notified = True
+            self.status_label.configure(
+        text="⏳ ผ่านไปแล้วครึ่งทาง! ทำการเปลี่ยนท่านั่งได้",
+        font=ctk.CTkFont(size=20, weight="bold"),
+        text_color="#FFA500"  # สีส้ม
+    )
 
     def update_frames(self):
         ret1, frame1 = self.cap1.read()
@@ -697,7 +693,16 @@ class DualCameraApp(ctk.CTk):
             if self.recording:
                 self.out1.write(frame1)
                 self.out2.write(frame2)
+
+                # เพิ่มจำนวนเฟรมที่บันทึก
+                self.recorded_frame_count += 1
+
+                # อัปเดตตัวจับเวลา
                 self.update_timer()
+
+                # หยุดการบันทึกเมื่อครบจำนวนเฟรมที่กำหนด
+                if self.recorded_frame_count >= self.target_frame_count:
+                    self.stop_recording()
 
         self.after(self.frame_interval, self.update_frames)
 
