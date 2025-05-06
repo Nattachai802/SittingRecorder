@@ -4,3 +4,8 @@ tk
 customtkinter
 time
 datetime
+matplotlib
+tqdm
+mediapipe
+scikit-image
+pathlib
