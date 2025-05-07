@@ -1,4 +1,3 @@
-
 import cv2
 import math
 from pathlib import Path
@@ -138,10 +137,18 @@ def redundancy_stats(video_path: str,
 # ---------- CONFIG ----------
 VIS_TH      = 0.5          # threshold visibility
 SSIM_TH     = 0.95         # two frames “ซ้ำ” ถ้า SSIM > 0.95
-JOINTS_IDX  = [            # ข้อต่อหลักที่ติดตาม Jitter
+JOINTS_IDX = [
+    mp.solutions.pose.PoseLandmark.NOSE,
+    mp.solutions.pose.PoseLandmark.LEFT_EAR,
+    mp.solutions.pose.PoseLandmark.RIGHT_EAR,
     mp.solutions.pose.PoseLandmark.LEFT_SHOULDER,
+    mp.solutions.pose.PoseLandmark.RIGHT_SHOULDER,
+    mp.solutions.pose.PoseLandmark.LEFT_ELBOW,
+    mp.solutions.pose.PoseLandmark.RIGHT_ELBOW,
+    mp.solutions.pose.PoseLandmark.LEFT_WRIST,
+    mp.solutions.pose.PoseLandmark.RIGHT_WRIST,
     mp.solutions.pose.PoseLandmark.LEFT_HIP,
-    mp.solutions.pose.PoseLandmark.LEFT_WRIST
+    mp.solutions.pose.PoseLandmark.RIGHT_HIP,
 ]
 
 # ---------- HELPER -----------
@@ -167,11 +174,14 @@ def analyse_clip(path: str):
     res = mp_pose.process(cv2.cvtColor(prev, cv2.COLOR_BGR2RGB))
     if res.pose_landmarks:
         lm = res.pose_landmarks.landmark
-        visible_cnt = sum(pt.visibility > VIS_TH for pt in lm)
+        ref_visible = [pt.visibility > VIS_TH for pt in lm]  # เก็บว่าจุดไหน "มองเห็น"
+        visible_cnt = sum(ref_visible)
         if visible_cnt == len(lm):
             full_landmark += 1
         for idx in JOINTS_IDX:
             traj[idx].append([lm[idx].x, lm[idx].y])
+    else:
+        ref_visible = [False] * len(JOINTS_IDX)
 
     # ----- loop rest frames -----
     while True:
@@ -189,8 +199,11 @@ def analyse_clip(path: str):
         res = mp_pose.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         if res.pose_landmarks:
             lm = res.pose_landmarks.landmark
-            visible_cnt = sum(pt.visibility > VIS_TH for pt in lm)
-            if visible_cnt == len(lm):
+            match_cnt = sum(
+                (ref and (pt.visibility > VIS_TH))
+                for ref, pt in zip(ref_visible, lm)
+            )
+            if match_cnt / sum(ref_visible) >= 0.9:  # มีจุดที่ตรวจเจอ >= 90% ของ baseline
                 full_landmark += 1
             for idx in JOINTS_IDX:
                 traj[idx].append([lm[idx].x, lm[idx].y])

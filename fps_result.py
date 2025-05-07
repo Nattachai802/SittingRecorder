@@ -1,4 +1,7 @@
+"""
+เป็นแนวทางการวิเคราะห์ผลการทดสอบ FPS แต่ให้ผลลัพธ์เพียง 1 เดียว อาจจะไม่เหมาะกับการใช้งานจริง
 
+"""
 from __future__ import annotations
 import pandas as pd
 import re, itertools, math

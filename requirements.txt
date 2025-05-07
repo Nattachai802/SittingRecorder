@@ -2,10 +2,11 @@ pillow
 opencv-python
 tk
 customtkinter
-time
-datetime
 matplotlib
 tqdm
 mediapipe
 scikit-image
 pathlib
+pandas
+numpy
+statsmodels
