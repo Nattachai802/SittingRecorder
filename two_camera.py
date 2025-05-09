@@ -8,6 +8,11 @@ import datetime
 import os
 import glob
 
+import platform
+if platform.system() == "Windows":
+    import winsound
+
+
 # กำหนดธีม - ใช้ธีม minimal และสีส้ม
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("green")  # ใช้เป็นพื้นฐานแล้วจะกำหนดสีส้มเอง
@@ -304,21 +309,7 @@ class DualCameraApp(ctk.CTk):
         )
         self.timer_display.pack(anchor="w")
 
-        self.duration_var = ctk.StringVar(value="10")
-        self.duration_dropdown = ctk.CTkComboBox(
-            timer_container,
-            values=["10", "15", "20"],
-            variable=self.duration_var,
-            width=80,
-            fg_color="#FFFFFF",
-            border_color=self.accent_color,
-            button_color=self.accent_color,
-            dropdown_fg_color="#FFFFFF",
-            dropdown_text_color=self.text_color,
-            font=ctk.CTkFont(size=14)
-        )
-        self.duration_dropdown.pack(anchor="w", pady=(5, 0))
-
+        
     def create_recording_buttons(self):
         buttons_container = ctk.CTkFrame(self.control_frame, fg_color=self.bg_color, corner_radius=0)
         buttons_container.pack(fill="x", pady=(10, 20))
@@ -595,7 +586,7 @@ class DualCameraApp(ctk.CTk):
         self.out2 = cv2.VideoWriter(filename2, fourcc, self.fps, (640, 480))
 
         self.recording = True
-        self.recording_target_duration = int(self.duration_var.get())
+        self.recording_target_duration = 13
         self.halfway_notified = False  # Add a flag for halfway notification
 
         # ตั้งค่าตัวแปรสำหรับการนับเฟรม
@@ -605,6 +596,9 @@ class DualCameraApp(ctk.CTk):
         self.start_button.configure(state="disabled", fg_color="#CCCCCC", text_color="#666666")
         self.status_label.configure(text=f"กำลังบันทึก... ({posture})")
         self.countdown_label.configure(text="")  # Clear countdown
+
+        if platform.system() == "Windows":
+            winsound.Beep(1500, 300)
 
     def stop_recording(self):
         self.recording = False
@@ -633,8 +627,12 @@ class DualCameraApp(ctk.CTk):
         self.timer_display.configure(text=self.recording_duration)
 
         # แจ้งเตือนเมื่อถึงครึ่งหนึ่งของเวลา
-        if not self.halfway_notified and self.recorded_frame_count >= self.target_frame_count // 2:
+        if not self.halfway_notified and self.recorded_frame_count >= int(self.fps * 3):
             self.halfway_notified = True
+
+            if platform.system() == "Windows":
+                winsound.Beep(1000, 300)
+            
             self.status_label.configure(
         text="⏳ ผ่านไปแล้วครึ่งทาง! ทำการเปลี่ยนท่านั่งได้",
         font=ctk.CTkFont(size=20, weight="bold"),
@@ -699,9 +697,16 @@ class DualCameraApp(ctk.CTk):
 
                 # อัปเดตตัวจับเวลา
                 self.update_timer()
-
+                if self.recording and self.recorded_frame_count in [
+                    self.target_frame_count - int(3 * self.fps),
+                    self.target_frame_count - int(2 * self.fps),
+                    self.target_frame_count - int(1 * self.fps)
+                ]:
+                    if platform.system() == "Windows":
+                        winsound.Beep(1200, 200)
                 # หยุดการบันทึกเมื่อครบจำนวนเฟรมที่กำหนด
                 if self.recorded_frame_count >= self.target_frame_count:
+                    
                     self.stop_recording()
 
         self.after(self.frame_interval, self.update_frames)
